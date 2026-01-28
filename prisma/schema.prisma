@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Goal {
+  id              String   @id @default(cuid())
+  name            String
+  category        String   @default("personal") // workout, reading, personal, health, learning, etc.
+  targetCount     Int      // how many times
+  targetPeriod    String   // "day", "week", "month", "year"
+  icon            String?  // emoji or icon name
+  color           String?  // hex color for the goal
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  logs            GoalLog[]
+}
+
+model GoalLog {
+  id          String   @id @default(cuid())
+  date        DateTime @db.Date
+  goalId      String
+  goal        Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  completed   Boolean  @default(false)
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@unique([date, goalId])
+}
+
+model ReminderSettings {
+  id        String   @id @default(cuid())
+  email     String
+  time      String   @default("08:30") // HH:MM format
+  enabled   Boolean  @default(true)
+  timezone  String   @default("America/Los_Angeles")
+  updatedAt DateTime @updatedAt
+}
