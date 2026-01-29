@@ -19,7 +19,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, category, targetCount, targetPeriod, icon, color } = body;
+    const { name, category, goalType, targetCount, targetPeriod, icon, color } = body;
 
     if (!name || !targetCount || !targetPeriod) {
       return NextResponse.json(
@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         category: category || 'personal',
+        goalType: goalType || 'boolean',
         targetCount: parseInt(targetCount),
         targetPeriod,
         icon: icon || null,

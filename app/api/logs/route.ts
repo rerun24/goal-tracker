@@ -89,11 +89,13 @@ export async function GET(request: NextRequest) {
         goalId: goal.id,
         name: goal.name,
         category: goal.category,
+        goalType: goal.goalType,
         targetCount: goal.targetCount,
         targetPeriod: goal.targetPeriod,
         icon: goal.icon,
         color: goal.color,
         completed: log?.completed || false,
+        count: log?.count || 0,
         notes: log?.notes || '',
         logId: log?.id || null,
       };
@@ -112,7 +114,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { date, goalId, completed, notes } = body;
+    const { date, goalId, completed, count, notes } = body;
 
     if (!date || !goalId) {
       return NextResponse.json(
@@ -122,6 +124,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { date: dateObj } = parseDateString(date);
+
+    // Build update data based on what's provided
+    const updateData: { completed?: boolean; count?: number; notes?: string | null } = {};
+    if (completed !== undefined) updateData.completed = completed;
+    if (count !== undefined) updateData.count = Math.max(0, count); // Ensure count is non-negative
+    if (notes !== undefined) updateData.notes = notes || null;
 
     const log = await prisma.goalLog.upsert({
       where: {
@@ -134,12 +142,10 @@ export async function POST(request: NextRequest) {
         date: dateObj,
         goalId,
         completed: completed || false,
+        count: count !== undefined ? Math.max(0, count) : 0,
         notes: notes || null,
       },
-      update: {
-        completed: completed || false,
-        notes: notes || null,
-      },
+      update: updateData,
     });
 
     return NextResponse.json(log);

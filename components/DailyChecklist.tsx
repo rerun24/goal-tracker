@@ -7,11 +7,13 @@ interface GoalLog {
   goalId: string;
   name: string;
   category: string;
+  goalType: string;
   targetCount: number;
   targetPeriod: string;
   icon: string | null;
   color: string | null;
   completed: boolean;
+  count: number;
   notes: string;
 }
 
@@ -20,8 +22,7 @@ interface DailyChecklistProps {
   goals: GoalLog[];
   onUpdateLog: (
     goalId: string,
-    completed: boolean,
-    notes?: string
+    updates: { completed?: boolean; count?: number; notes?: string }
   ) => Promise<void>;
 }
 
@@ -58,10 +59,22 @@ export default function DailyChecklist({
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
   const [noteText, setNoteText] = useState<{ [key: string]: string }>({});
 
-  const handleToggle = async (goal: GoalLog) => {
+  // Handle boolean goal toggle
+  const handleBooleanToggle = async (goal: GoalLog) => {
     setUpdating(goal.goalId);
     try {
-      await onUpdateLog(goal.goalId, !goal.completed, noteText[goal.goalId] || goal.notes);
+      await onUpdateLog(goal.goalId, { completed: !goal.completed });
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  // Handle count increment
+  const handleCountChange = async (goal: GoalLog, delta: number) => {
+    const newCount = Math.max(0, goal.count + delta);
+    setUpdating(goal.goalId);
+    try {
+      await onUpdateLog(goal.goalId, { count: newCount });
     } finally {
       setUpdating(null);
     }
@@ -70,14 +83,22 @@ export default function DailyChecklist({
   const handleNoteSave = async (goal: GoalLog) => {
     setUpdating(goal.goalId);
     try {
-      await onUpdateLog(goal.goalId, goal.completed, noteText[goal.goalId] || '');
+      await onUpdateLog(goal.goalId, { notes: noteText[goal.goalId] || '' });
       setExpandedGoal(null);
     } finally {
       setUpdating(null);
     }
   };
 
-  const completedCount = goals.filter((g) => g.completed).length;
+  // Calculate completion - for count goals, consider completed if count > 0
+  const getCompletionStatus = (goal: GoalLog) => {
+    if (goal.goalType === 'count') {
+      return goal.count > 0;
+    }
+    return goal.completed;
+  };
+
+  const completedCount = goals.filter(getCompletionStatus).length;
   const progressPercent = goals.length > 0 ? (completedCount / goals.length) * 100 : 0;
 
   const formatDate = (dateStr: string) => {
@@ -147,111 +168,153 @@ export default function DailyChecklist({
         </Card>
       ) : (
         <div className="space-y-3">
-          {goals.map((goal, index) => (
-            <div
-              key={goal.goalId}
-              className="animate-slide-up"
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <Card
-                padding="none"
-                variant={goal.completed ? 'success' : 'default'}
-                className="overflow-hidden"
+          {goals.map((goal, index) => {
+            const isCompleted = getCompletionStatus(goal);
+            const isCountGoal = goal.goalType === 'count';
+
+            return (
+              <div
+                key={goal.goalId}
+                className="animate-slide-up"
+                style={{ animationDelay: `${index * 50}ms` }}
               >
-                <div className="flex items-stretch">
-                  {/* Color Bar */}
-                  <div className={`w-1.5 bg-gradient-to-b ${getGradient(goal)}`} />
+                <Card
+                  padding="none"
+                  variant={isCompleted ? 'success' : 'default'}
+                  className="overflow-hidden"
+                >
+                  <div className="flex items-stretch">
+                    {/* Color Bar */}
+                    <div className={`w-1.5 bg-gradient-to-b ${getGradient(goal)}`} />
 
-                  <div className="flex-1 p-4">
-                    <div className="flex items-center gap-4">
-                      {/* Icon */}
-                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${getGradient(goal)} flex items-center justify-center text-2xl shadow-lg`}>
-                        {goal.completed ? '✓' : getIcon(goal)}
-                      </div>
+                    <div className="flex-1 p-4">
+                      <div className="flex items-center gap-4">
+                        {/* Icon */}
+                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${getGradient(goal)} flex items-center justify-center text-2xl shadow-lg`}>
+                          {isCompleted ? '✓' : getIcon(goal)}
+                        </div>
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <h3 className={`font-semibold text-lg ${goal.completed ? 'text-emerald-700' : 'text-gray-900'}`}>
-                          {goal.name}
-                        </h3>
-                        <p className="text-sm text-gray-500 capitalize">
-                          {goal.category} • {goal.targetCount}x per {goal.targetPeriod}
-                        </p>
-                      </div>
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className={`font-semibold text-lg ${isCompleted ? 'text-emerald-700' : 'text-gray-900'}`}>
+                            {goal.name}
+                          </h3>
+                          <p className="text-sm text-gray-500 capitalize">
+                            {goal.category} • {goal.targetCount}x per {goal.targetPeriod}
+                            {isCountGoal && goal.count > 0 && (
+                              <span className="ml-2 text-emerald-600 font-medium">
+                                ({goal.count} today)
+                              </span>
+                            )}
+                          </p>
+                        </div>
 
-                      {/* Actions */}
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setExpandedGoal(expandedGoal === goal.goalId ? null : goal.goalId)}
-                          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                          title="Add note"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleToggle(goal)}
-                          disabled={updating === goal.goalId}
-                          className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all duration-200 ${
-                            goal.completed
-                              ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/25'
-                              : 'bg-white border-gray-300 text-gray-400 hover:border-primary-400 hover:text-primary-500'
-                          } ${updating === goal.goalId ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          {updating === goal.goalId ? (
-                            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        {/* Actions */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setExpandedGoal(expandedGoal === goal.goalId ? null : goal.goalId)}
+                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="Add note"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
+                          </button>
+
+                          {isCountGoal ? (
+                            /* Count-based goal UI */
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleCountChange(goal, -1)}
+                                disabled={updating === goal.goalId || goal.count === 0}
+                                className="w-10 h-10 rounded-xl border-2 border-gray-300 bg-white text-gray-600 hover:border-red-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center font-bold text-xl"
+                              >
+                                −
+                              </button>
+                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                                {updating === goal.goalId ? (
+                                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                  </svg>
+                                ) : (
+                                  goal.count
+                                )}
+                              </div>
+                              <button
+                                onClick={() => handleCountChange(goal, 1)}
+                                disabled={updating === goal.goalId}
+                                className="w-10 h-10 rounded-xl border-2 border-gray-300 bg-white text-gray-600 hover:border-emerald-400 hover:text-emerald-500 hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center font-bold text-xl"
+                              >
+                                +
+                              </button>
+                            </div>
                           ) : (
-                            <svg className={`w-6 h-6 ${goal.completed ? 'animate-check' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
+                            /* Boolean goal UI */
+                            <button
+                              onClick={() => handleBooleanToggle(goal)}
+                              disabled={updating === goal.goalId}
+                              className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all duration-200 ${
+                                goal.completed
+                                  ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/25'
+                                  : 'bg-white border-gray-300 text-gray-400 hover:border-primary-400 hover:text-primary-500'
+                              } ${updating === goal.goalId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              {updating === goal.goalId ? (
+                                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                              ) : (
+                                <svg className={`w-6 h-6 ${goal.completed ? 'animate-check' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </button>
                           )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Notes Section */}
-                    {expandedGoal === goal.goalId && (
-                      <div className="mt-4 pt-4 border-t border-gray-100 animate-fade-in">
-                        <textarea
-                          value={noteText[goal.goalId] ?? goal.notes}
-                          onChange={(e) => setNoteText({ ...noteText, [goal.goalId]: e.target.value })}
-                          placeholder="Add a note about this goal..."
-                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                          rows={2}
-                        />
-                        <div className="flex justify-end gap-2 mt-2">
-                          <button
-                            onClick={() => setExpandedGoal(null)}
-                            className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={() => handleNoteSave(goal)}
-                            disabled={updating === goal.goalId}
-                            className="px-3 py-1.5 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
-                          >
-                            Save
-                          </button>
                         </div>
                       </div>
-                    )}
 
-                    {/* Existing Note Display */}
-                    {goal.notes && expandedGoal !== goal.goalId && (
-                      <p className="mt-2 text-sm text-gray-500 italic">
-                        &quot;{goal.notes}&quot;
-                      </p>
-                    )}
+                      {/* Notes Section */}
+                      {expandedGoal === goal.goalId && (
+                        <div className="mt-4 pt-4 border-t border-gray-100 animate-fade-in">
+                          <textarea
+                            value={noteText[goal.goalId] ?? goal.notes}
+                            onChange={(e) => setNoteText({ ...noteText, [goal.goalId]: e.target.value })}
+                            placeholder="Add a note about this goal..."
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                            rows={2}
+                          />
+                          <div className="flex justify-end gap-2 mt-2">
+                            <button
+                              onClick={() => setExpandedGoal(null)}
+                              className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleNoteSave(goal)}
+                              disabled={updating === goal.goalId}
+                              className="px-3 py-1.5 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Existing Note Display */}
+                      {goal.notes && expandedGoal !== goal.goalId && (
+                        <p className="mt-2 text-sm text-gray-500 italic">
+                          &quot;{goal.notes}&quot;
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Card>
-            </div>
-          ))}
+                </Card>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

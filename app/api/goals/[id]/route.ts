@@ -38,13 +38,14 @@ export async function PUT(
   try {
     const { id } = await context.params;
     const body = await request.json();
-    const { name, category, targetCount, targetPeriod, icon, color } = body;
+    const { name, category, goalType, targetCount, targetPeriod, icon, color } = body;
 
     const goal = await prisma.goal.update({
       where: { id },
       data: {
         ...(name && { name }),
         ...(category && { category }),
+        ...(goalType && { goalType }),
         ...(targetCount && { targetCount: parseInt(targetCount) }),
         ...(targetPeriod && { targetPeriod }),
         ...(icon !== undefined && { icon }),

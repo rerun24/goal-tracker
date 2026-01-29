@@ -9,11 +9,13 @@ interface GoalLog {
   goalId: string;
   name: string;
   category: string;
+  goalType: string;
   targetCount: number;
   targetPeriod: string;
   icon: string | null;
   color: string | null;
   completed: boolean;
+  count: number;
   notes: string;
 }
 
@@ -43,13 +45,19 @@ export default function HomePage() {
 
   const handleUpdateLog = async (
     goalId: string,
-    completed: boolean,
-    notes?: string
+    updates: { completed?: boolean; count?: number; notes?: string }
   ) => {
     // Optimistic update
     setGoals((prev) =>
       prev.map((g) =>
-        g.goalId === goalId ? { ...g, completed, notes: notes || g.notes } : g
+        g.goalId === goalId
+          ? {
+              ...g,
+              ...(updates.completed !== undefined && { completed: updates.completed }),
+              ...(updates.count !== undefined && { count: updates.count }),
+              ...(updates.notes !== undefined && { notes: updates.notes }),
+            }
+          : g
       )
     );
 
@@ -57,7 +65,7 @@ export default function HomePage() {
       await fetch('/api/logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, goalId, completed, notes }),
+        body: JSON.stringify({ date, goalId, ...updates }),
       });
     } catch (error) {
       console.error('Error updating log:', error);

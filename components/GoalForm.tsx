@@ -7,6 +7,7 @@ interface Goal {
   id?: string;
   name: string;
   category: string;
+  goalType: string;
   targetCount: number;
   targetPeriod: string;
   icon?: string | null;
@@ -38,9 +39,25 @@ const periods = [
   { value: 'year', label: 'Yearly' },
 ];
 
+const goalTypes = [
+  {
+    value: 'boolean',
+    label: 'Checkoff',
+    description: 'Complete once per day (e.g., "Did I workout today?")',
+    icon: '✓'
+  },
+  {
+    value: 'count',
+    label: 'Counter',
+    description: 'Track multiple completions per day (e.g., "2 books read")',
+    icon: '#'
+  },
+];
+
 export default function GoalForm({ goal, onSubmit, onCancel }: GoalFormProps) {
   const [name, setName] = useState(goal?.name || '');
   const [category, setCategory] = useState(goal?.category || 'personal');
+  const [goalType, setGoalType] = useState(goal?.goalType || 'boolean');
   const [targetCount, setTargetCount] = useState(goal?.targetCount || 1);
   const [targetPeriod, setTargetPeriod] = useState(goal?.targetPeriod || 'day');
   const [loading, setLoading] = useState(false);
@@ -49,7 +66,7 @@ export default function GoalForm({ goal, onSubmit, onCancel }: GoalFormProps) {
     e.preventDefault();
     setLoading(true);
     try {
-      await onSubmit({ name, category, targetCount, targetPeriod });
+      await onSubmit({ name, category, goalType, targetCount, targetPeriod });
     } finally {
       setLoading(false);
     }
@@ -71,6 +88,45 @@ export default function GoalForm({ goal, onSubmit, onCancel }: GoalFormProps) {
           className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
           required
         />
+      </div>
+
+      {/* Goal Type Selection */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Goal Type
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          {goalTypes.map((type) => (
+            <button
+              key={type.value}
+              type="button"
+              onClick={() => setGoalType(type.value)}
+              className={`flex flex-col items-start p-4 rounded-xl border-2 transition-all text-left ${
+                goalType === type.value
+                  ? 'border-primary-500 bg-primary-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg font-bold ${
+                  goalType === type.value
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-gray-200 text-gray-600'
+                }`}>
+                  {type.icon}
+                </span>
+                <span className={`font-semibold ${
+                  goalType === type.value ? 'text-primary-700' : 'text-gray-700'
+                }`}>
+                  {type.label}
+                </span>
+              </div>
+              <span className="text-xs text-gray-500 mt-1">
+                {type.description}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Category Selection */}
@@ -141,7 +197,13 @@ export default function GoalForm({ goal, onSubmit, onCancel }: GoalFormProps) {
           <span className="font-medium text-primary-600">
             {targetCount}x per {targetPeriod}
           </span>
-          {' in your daily checklist.'}
+          {' in your daily checklist'}
+          {goalType === 'count' && (
+            <span className="text-gray-500">
+              {' (you can log multiple completions each day)'}
+            </span>
+          )}
+          {'.'}
         </p>
       </div>
 

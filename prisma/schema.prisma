@@ -11,7 +11,8 @@ model Goal {
   id              String   @id @default(cuid())
   name            String
   category        String   @default("personal") // workout, reading, personal, health, learning, etc.
-  targetCount     Int      // how many times
+  goalType        String   @default("boolean")  // "boolean" or "count"
+  targetCount     Int      // how many times per period
   targetPeriod    String   // "day", "week", "month", "year"
   icon            String?  // emoji or icon name
   color           String?  // hex color for the goal
@@ -26,6 +27,7 @@ model GoalLog {
   goalId      String
   goal        Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
   completed   Boolean  @default(false)
+  count       Int      @default(0)  // for count-based goals
   notes       String?
   createdAt   DateTime @default(now())
 

@@ -10,6 +10,7 @@ interface Goal {
   id: string;
   name: string;
   category: string;
+  goalType: string;
   targetCount: number;
   targetPeriod: string;
   icon: string | null;

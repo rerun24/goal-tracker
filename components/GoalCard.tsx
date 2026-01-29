@@ -8,6 +8,7 @@ interface Goal {
   id: string;
   name: string;
   category: string;
+  goalType: string;
   targetCount: number;
   targetPeriod: string;
   icon: string | null;
@@ -79,9 +80,16 @@ export default function GoalCard({ goal, onEdit, onDelete }: GoalCardProps) {
               <h3 className="font-semibold text-lg text-gray-900 group-hover:text-primary-600 transition-colors">
                 {goal.name}
               </h3>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 capitalize">
                   {goal.category}
+                </span>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  goal.goalType === 'count'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-emerald-100 text-emerald-700'
+                }`}>
+                  {goal.goalType === 'count' ? '# Counter' : '✓ Checkoff'}
                 </span>
                 <span className="text-sm text-gray-500">
                   {goal.targetCount}x {periodLabel}

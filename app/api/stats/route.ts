@@ -119,10 +119,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Fill in completed counts
+    // For count-based goals, consider completed if count > 0
+    // For boolean goals, use the completed field
     logs.forEach((log) => {
       const dateStr = formatDateString(log.date);
-      if (dailyStats[dateStr] && log.completed) {
-        dailyStats[dateStr].completed++;
+      if (dailyStats[dateStr]) {
+        const isCompleted = log.goal.goalType === 'count' ? log.count > 0 : log.completed;
+        if (isCompleted) {
+          dailyStats[dateStr].completed++;
+        }
       }
     });
 
@@ -149,14 +154,25 @@ export async function GET(request: NextRequest) {
     }
 
     // Overall stats
-    const totalCompleted = logs.filter((l) => l.completed).length;
+    const totalCompleted = logs.filter((l) => {
+      return l.goal.goalType === 'count' ? l.count > 0 : l.completed;
+    }).length;
     const totalExpected = Object.values(dailyStats).reduce((sum, d) => sum + d.total, 0);
     const overallRate = totalExpected > 0 ? Math.round((totalCompleted / totalExpected) * 100) : 0;
 
     // Per-goal stats with progress toward target
     const goalStats = goals.map((goal) => {
-      const goalLogs = logs.filter((l) => l.goalId === goal.id && l.completed);
-      const completed = goalLogs.length;
+      const goalLogs = logs.filter((l) => l.goalId === goal.id);
+      // For count goals, sum the counts; for boolean, count completed days
+      let completed: number;
+      let totalCount = 0;
+
+      if (goal.goalType === 'count') {
+        totalCount = goalLogs.reduce((sum, l) => sum + l.count, 0);
+        completed = goalLogs.filter((l) => l.count > 0).length;
+      } else {
+        completed = goalLogs.filter((l) => l.completed).length;
+      }
 
       // Calculate expected based on period
       let expected: number;
@@ -188,9 +204,11 @@ export async function GET(request: NextRequest) {
         id: goal.id,
         name: goal.name,
         category: goal.category,
+        goalType: goal.goalType,
         icon: goal.icon,
         color: goal.color,
         completed,
+        totalCount, // Total count for count-based goals
         expected,
         target: goal.targetCount,
         targetPeriod: goal.targetPeriod,
